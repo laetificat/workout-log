@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #181818;
+    --surface2: #222;
+    --border: #2a2a2a;
+    --accent: #c8f96e;
+    --text: #f0f0f0;
+    --muted: #666;
+    --push: #ff6b6b;
+    --pull: #6baaff;
+    --legs: #ffcc6b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  input, textarea, select { font-size: 16px !important; }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 15px; min-height: 100vh;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 100;
+  }
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif; font-size: 28px;
+    letter-spacing: 2px; color: var(--accent);
+  }
+
+  .tab-bar {
+    display: flex; gap: 6px; padding: 14px 24px 0;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border);
+    background: none; color: var(--muted); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .tab.active { background: var(--accent); color: #111; border-color: var(--accent); }
+
+  .view { display: none; padding: 20px 24px 100px; }
+  .view.active { display: block; }
+
+  /* ── WEEK CARDS ── */
+  .week-card {
+    background: var(--surface); border-radius: 14px;
+    margin-bottom: 16px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .week-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; cursor: pointer; user-select: none;
+  }
+  .week-label {
+    font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1.5px;
+  }
+  .week-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chevron { color: var(--muted); transition: transform 0.2s; font-size: 18px; }
+  .week-card.open .chevron { transform: rotate(180deg); }
+  .week-body { display: none; padding: 0 18px 16px; }
+  .week-card.open .week-body { display: block; }
+
+  /* ── WEEK ACTIONS ── */
+  .week-header-left { flex: 1; min-width: 0; }
+  .week-actions {
+    display: flex; gap: 6px; align-items: center; margin-left: 10px;
+  }
+  .week-action-btn {
+    background: none; border: none; cursor: pointer; font-size: 15px;
+    padding: 6px 8px; border-radius: 8px; color: var(--muted);
+    transition: background 0.12s, color 0.12s; line-height: 1; flex-shrink: 0;
+  }
+  .week-action-btn:hover { background: var(--surface2); }
+  .week-action-btn.edit:hover { color: var(--accent); }
+  .week-action-btn.delete:hover { color: var(--push); }
+
+  /* ── CATEGORY BLOCK ── */
+  .cat-block { margin-top: 14px; }
+  .cat-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .cat-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .cat-push { color: var(--push); }
+  .cat-pull { color: var(--pull); }
+  .cat-legs { color: var(--legs); }
+
+  .cat-date-btn {
+    font-size: 12px; color: var(--muted); background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 3px 10px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .cat-date-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .cat-date-btn.has-date { color: var(--text); }
+
+  .cat-date-input-wrap {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .cat-date-input {
+    background: var(--surface2); border: 1.5px solid var(--accent);
+    border-radius: 8px; color: var(--accent); font-family: 'DM Sans', sans-serif;
+    padding: 3px 8px; outline: none; font-size: 13px;
+  }
+  .cat-date-clear {
+    background: none; border: none; color: var(--muted);
+    font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
+  }
+  .cat-date-clear:hover { color: var(--push); }
+
+  /* ── EXERCISE ROWS ── */
+  .exercise-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 0; border-bottom: 1px solid var(--border);
+  }
+  .exercise-row:last-child { border-bottom: none; }
+  .ex-name { color: #ccc; font-size: 14px; flex: 1; }
+
+  .ex-weight {
+    font-weight: 600; font-size: 14px; color: var(--text);
+    background: var(--surface2); padding: 3px 10px;
+    border-radius: 8px; min-width: 52px; text-align: center;
+    cursor: pointer; transition: background 0.15s, color 0.15s; user-select: none;
+  }
+  .ex-weight:hover { background: #2e2e2e; color: var(--accent); }
+  .ex-weight.empty { color: var(--muted); font-weight: 400; }
+  .ex-weight.empty:hover { color: var(--accent); }
+
+  .inline-edit-wrap { display: flex; align-items: center; gap: 4px; }
+  .inline-input {
+    width: 64px; background: var(--surface2); border: 1.5px solid var(--accent);
+    border-radius: 8px; color: var(--accent); font-family: 'DM Sans', sans-serif;
+    font-weight: 600; padding: 3px 8px; text-align: center; outline: none;
+  }
+  .inline-clear {
+    background: none; border: none; color: var(--muted);
+    font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
+  }
+  .inline-clear:hover { color: var(--push); }
+
+  /* ── PROGRESS ── */
+  .cat-pills { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .cat-pill {
+    padding: 6px 14px; border-radius: 16px; border: none;
+    font-size: 12px; font-weight: 600; cursor: pointer; opacity: 0.4; transition: opacity 0.15s;
+  }
+  .cat-pill.active { opacity: 1; }
+  .cat-pill.push { background: var(--push); color: #111; }
+  .cat-pill.pull { background: var(--pull); color: #111; }
+  .cat-pill.legs { background: var(--legs); color: #111; }
+
+  .ex-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+  .ex-btn {
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; cursor: pointer; text-align: left; transition: all 0.15s;
+  }
+  .ex-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(200,249,110,0.07); }
+
+  .chart-area {
+    background: var(--surface); border-radius: 14px;
+    padding: 20px; margin-top: 4px; border: 1px solid var(--border);
+  }
+  .chart-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; margin-bottom: 16px; color: var(--accent); }
+  .chart-wrap { position: relative; height: 160px; }
+  svg.linechart { width: 100%; height: 100%; overflow: visible; }
+  .chart-no-data { color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; }
+  .data-points { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .dp-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #aaa; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .dp-row:last-child { border-bottom: none; }
+  .dp-val { font-weight: 600; color: var(--text); }
+  .dp-delta { font-size: 12px; }
+  .dp-up { color: var(--accent); }
+  .dp-down { color: var(--push); }
+  .dp-same { color: var(--muted); }
+
+  /* ── ADD WEEK FORM ── */
+  .form-week-row {
+    display: flex; gap: 10px; margin-bottom: 20px; align-items: flex-end;
+  }
+  .form-week-field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .form-week-field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .form-week-field input[type="number"],
+  .form-week-field input[type="date"] {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    padding: 9px 14px; outline: none; width: 100%;
+  }
+  .form-week-field input:focus { border-color: var(--accent); }
+
+  .form-section { background: var(--surface); border-radius: 14px; padding: 18px; margin-bottom: 14px; border: 1px solid var(--border); }
+  .form-section-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+  }
+  .form-section-title { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+  .form-section-date {
+    display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
+  }
+  .form-section-date label { font-size: 11px; color: var(--muted); }
+  .form-section-date input[type="date"] {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    padding: 5px 10px; outline: none;
+  }
+  .form-section-date input[type="date"]:focus { border-color: var(--accent); }
+
+  .form-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .form-row:last-child { margin-bottom: 0; }
+  .form-row label { color: #bbb; font-size: 14px; flex: 1; }
+  .form-row input[type="number"] {
+    width: 80px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-weight: 600; padding: 7px 10px; text-align: center; outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-row input[type="number"]:focus { border-color: var(--accent); }
+
+  .save-btn {
+    width: 100%; padding: 16px; background: var(--accent); color: #111; border: none;
+    border-radius: 14px; font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+    letter-spacing: 2px; cursor: pointer; margin-top: 8px; transition: opacity 0.15s;
+  }
+  .save-btn:active { opacity: 0.8; }
+
+  /* ── MANAGE EXERCISES ── */
+  .manage-cat-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .manage-cat-tab {
+    padding: 7px 16px; border-radius: 20px; border: 2px solid transparent;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    opacity: 0.45; transition: all 0.15s; background: var(--surface2);
+  }
+  .manage-cat-tab.push { color: var(--push); }
+  .manage-cat-tab.pull { color: var(--pull); }
+  .manage-cat-tab.legs { color: var(--legs); }
+  .manage-cat-tab.active { opacity: 1; }
+  .manage-cat-tab.active.push { border-color: var(--push); }
+  .manage-cat-tab.active.pull { border-color: var(--pull); }
+  .manage-cat-tab.active.legs { border-color: var(--legs); }
+
+  .manage-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .manage-item {
+    display: flex; align-items: center; gap: 8px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    transition: border-color 0.15s;
+  }
+  .manage-item.editing { border-color: var(--accent); }
+  .manage-item-name {
+    flex: 1; font-size: 14px; color: var(--text); background: none;
+    border: none; outline: none; font-family: 'DM Sans', sans-serif; cursor: default;
+  }
+  .manage-item-name.editable { cursor: text; color: var(--accent); }
+  .item-action-btn {
+    background: none; border: none; cursor: pointer; font-size: 15px;
+    padding: 4px 6px; border-radius: 6px; transition: background 0.12s;
+    color: var(--muted); line-height: 1;
+  }
+  .item-action-btn:hover { background: var(--surface2); }
+  .item-action-btn.edit-btn:hover { color: var(--accent); }
+  .item-action-btn.confirm-rename { color: var(--accent); font-size: 17px; }
+  .item-action-btn.cancel-rename:hover { color: var(--muted); }
+  .item-action-btn.delete-btn:hover { color: var(--push); }
+
+  .add-ex-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .add-ex-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    padding: 10px 14px; outline: none; transition: border-color 0.15s;
+  }
+  .add-ex-input:focus { border-color: var(--accent); }
+  .add-ex-btn {
+    background: var(--accent); color: #111; border: none; border-radius: 10px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: 1px;
+    padding: 10px 18px; cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
+  }
+  .add-ex-btn:active { opacity: 0.75; }
+  .manage-note { font-size: 12px; color: var(--muted); margin-top: 16px; line-height: 1.6; }
+
+  /* DATA VIEW */
+  .data-section {
+    background: var(--surface); border-radius: 14px;
+    padding: 20px; margin-bottom: 14px; border: 1px solid var(--border);
+  }
+  .data-section-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 18px;
+    letter-spacing: 1px; margin-bottom: 6px; color: var(--accent);
+  }
+  .data-section-desc {
+    font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5;
+  }
+  .data-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 14px; border-radius: 12px;
+    font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s; border: none;
+  }
+  .data-btn:active { opacity: 0.75; }
+  .data-btn.export { background: var(--accent); color: #111; }
+  .data-btn.import { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .data-btn.danger  { background: var(--push); color: #fff; margin-top: 8px; }
+  .import-drop {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 28px 20px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s; margin-bottom: 4px;
+  }
+  .import-drop:hover, .import-drop.dragover {
+    border-color: var(--accent); background: rgba(200,249,110,0.05);
+  }
+  .import-drop-icon { font-size: 28px; margin-bottom: 8px; }
+  .import-drop-text { font-size: 14px; color: var(--muted); }
+  .import-drop-text span { color: var(--accent); font-weight: 600; }
+  #import-file-input { display: none; }
+
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+    z-index: 300; align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    background: var(--surface); border-radius: 20px 20px 0 0;
+    border: 1px solid var(--border); padding: 24px; width: 100%; max-width: 480px;
+  }
+  .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; }
+  .modal-body { font-size: 14px; color: #aaa; margin-bottom: 20px; line-height: 1.5; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-cancel {
+    flex: 1; padding: 13px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .modal-confirm {
+    flex: 1; padding: 13px; background: var(--push); border: none; border-radius: 12px;
+    color: #fff; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent); color: #111; padding: 10px 24px;
+    border-radius: 24px; font-weight: 600; font-size: 14px;
+    opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header><h1>WORKOUT LOG</h1></header>
+
+<div class="tab-bar">
+  <button class="tab active" onclick="showTab('log')">Log</button>
+  <button class="tab" onclick="showTab('progress')">Progressie</button>
+  <button class="tab" onclick="showTab('add')">+ Toevoegen</button>
+  <button class="tab" onclick="showTab('manage')">Oefeningen</button>
+  <button class="tab" onclick="showTab('data')">Data</button>
+</div>
+
+<div id="view-log" class="view active"></div>
+
+<div id="view-progress" class="view">
+  <div class="cat-pills">
+    <button class="cat-pill push active" onclick="filterCat('push',this)">Push</button>
+    <button class="cat-pill pull" onclick="filterCat('pull',this)">Pull</button>
+    <button class="cat-pill legs" onclick="filterCat('legs',this)">Legs</button>
+  </div>
+  <div class="ex-grid" id="ex-grid"></div>
+  <div class="chart-area" id="chart-area" style="display:none;"></div>
+</div>
+
+<div id="view-add" class="view">
+  <div class="form-week-row">
+    <div class="form-week-field">
+      <label>Jaar</label>
+      <input type="number" id="new-year" min="2020" max="2099">
+    </div>
+    <div class="form-week-field">
+      <label>Weeknummer</label>
+      <input type="number" id="new-week" min="1" max="53">
+    </div>
+  </div>
+  <div id="add-form-body"></div>
+  <button class="save-btn" onclick="saveWeek()">OPSLAAN</button>
+</div>
+
+<div id="view-manage" class="view">
+  <div class="manage-cat-tabs">
+    <button class="manage-cat-tab push active" onclick="switchManageCat('push',this)">Push</button>
+    <button class="manage-cat-tab pull" onclick="switchManageCat('pull',this)">Pull</button>
+    <button class="manage-cat-tab legs" onclick="switchManageCat('legs',this)">Legs</button>
+  </div>
+  <div class="manage-list" id="manage-list"></div>
+  <div class="add-ex-row">
+    <input type="text" class="add-ex-input" id="new-ex-name" placeholder="Nieuwe oefening…" maxlength="40">
+    <button class="add-ex-btn" onclick="addExercise()">Toevoegen</button>
+  </div>
+  <p class="manage-note">Hernoemen past de naam aan in alle weken. Verwijderen verwijdert de oefening uit alle weken.</p>
+</div>
+
+<div id="view-data" class="view">
+  <div class="data-section">
+    <div class="data-section-title">Exporteren</div>
+    <div class="data-section-desc">Download al je workouts en oefeningen als een JSON-bestand. Handig als backup of om over te zetten naar een ander apparaat.</div>
+    <button class="data-btn export" onclick="exportData()">⬇ Download backup</button>
+  </div>
+  <div class="data-section">
+    <div class="data-section-title">Importeren</div>
+    <div class="data-section-desc">Zet een eerder geëxporteerd bestand terug. Dit vervangt alle huidige data.</div>
+    <div class="import-drop" id="import-drop" onclick="document.getElementById('import-file-input').click()">
+      <div class="import-drop-icon">📂</div>
+      <div class="import-drop-text">Tik om een bestand te kiezen<br><span>of sleep het hier naartoe</span></div>
+    </div>
+    <input type="file" id="import-file-input" accept=".json">
+    <button class="data-btn import" onclick="document.getElementById('import-file-input').click()">⬆ Kies bestand</button>
+  </div>
+  <div class="data-section">
+    <div class="data-section-title">Reset</div>
+    <div class="data-section-desc">Verwijder alle data en begin opnieuw. Dit kan niet ongedaan worden gemaakt.</div>
+    <button class="data-btn danger" onclick="confirmReset()">Alles verwijderen</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-sheet">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal()">Annuleren</button>
+      <button class="modal-confirm" id="modal-confirm-btn">Verwijderen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STORAGE KEYS ────────────────────────────────────────
+const DATA_KEY = 'workout_weeks_v2';
+const EX_KEY   = 'workout_exercises_v1';
+
+// ── DATA SHAPE ──────────────────────────────────────────
+// weeks = [ { year, week, cats: { push: { date, exercises: {name: kg|null} }, pull: {...}, legs: {...} } } ]
+
+const DEFAULT_EXERCISES = {
+  push: ['Chest press','Dips','Deltoid raise','Shoulder press'],
+  pull: ['Bicep curl','Fixed lat pulldown','Low row (kabel)','Vertical row'],
+  legs: ['Seated leg press','Adductor','Leg extension','Abductor']
+};
+
+// Migrate old format (date-keyed) or return empty
+function loadData() {
+  // try new format first
+  const raw2 = localStorage.getItem(DATA_KEY);
+  if (raw2) return JSON.parse(raw2);
+
+  // try migrating old format
+  const raw1 = localStorage.getItem('workout_log_v1');
+  if (raw1) {
+    const old = JSON.parse(raw1);
+    const weeks = [];
+    old.forEach(session => {
+      const d = new Date(session.date);
+      const { year, week } = dateToYearWeek(session.date);
+      const exercises = loadExercises();
+      const cats = {};
+      ['push','pull','legs'].forEach(cat => {
+        const exObj = {};
+        (exercises[cat] || []).forEach(ex => {
+          exObj[ex] = session.exercises[ex] !== undefined ? session.exercises[ex] : null;
+        });
+        cats[cat] = { date: session.date, exercises: exObj };
+      });
+      const existing = weeks.find(w => w.year === year && w.week === week);
+      if (existing) {
+        ['push','pull','legs'].forEach(cat => {
+          Object.assign(existing.cats[cat].exercises, cats[cat].exercises);
+        });
+      } else {
+        weeks.push({ year, week, cats });
+      }
+    });
+    localStorage.setItem(DATA_KEY, JSON.stringify(weeks));
+    return weeks;
+  }
+
+  // no data yet
+  const empty = [];
+  localStorage.setItem(DATA_KEY, JSON.stringify(empty));
+  return empty;
+}
+
+function saveData(d) { localStorage.setItem(DATA_KEY, JSON.stringify(d)); }
+
+function loadExercises() {
+  const raw = localStorage.getItem(EX_KEY);
+  if (raw) return JSON.parse(raw);
+  return { push: [], pull: [], legs: [] };
+}
+function saveExercises(e) { localStorage.setItem(EX_KEY, JSON.stringify(e)); }
+
+// ── DATE / WEEK HELPERS ─────────────────────────────────
+// ISO week: Monday = start
+function dateToYearWeek(dateStr) {
+  const d = new Date(dateStr);
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  const startOfWeek1 = new Date(jan4);
+  startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const diff = d - startOfWeek1;
+  const week = Math.floor(diff / 604800000) + 1;
+  // handle edge: week 53/0 crossing year
+  if (week < 1) {
+    const prevYear = d.getFullYear() - 1;
+    return { year: prevYear, week: weeksInYear(prevYear) };
+  }
+  if (week > weeksInYear(d.getFullYear())) {
+    return { year: d.getFullYear() + 1, week: 1 };
+  }
+  return { year: d.getFullYear(), week };
+}
+
+function weeksInYear(y) {
+  // ISO weeks: year has 53 weeks if Jan 1 or Dec 31 is a Thursday
+  const jan1dow = (new Date(y, 0, 1).getDay() + 6) % 7; // 0=Mon
+  const dec31dow = (new Date(y, 11, 31).getDay() + 6) % 7;
+  return (jan1dow === 3 || dec31dow === 3) ? 53 : 52;
+}
+
+function formatDate(d) {
+  if (!d) return null;
+  const p = d.split('-');
+  return `${p[2]}-${p[1]}`;   // compact: DD-MM
+}
+
+function formatDateFull(d) {
+  if (!d) return null;
+  const p = d.split('-');
+  return `${p[2]}-${p[1]}-${p[0]}`;
+}
+
+function getCurrentYearWeek() {
+  return dateToYearWeek(new Date().toISOString().split('T')[0]);
+}
+
+// ── TOAST ────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// ── TABS ─────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const map = { log: 0, progress: 1, add: 2, manage: 3, data: 4 };
+  document.querySelectorAll('.tab')[map[name]].classList.add('active');
+  document.getElementById('view-' + name).classList.add('active');
+  if (name === 'log')      renderLog();
+  if (name === 'progress') renderProgress();
+  if (name === 'add')      renderAddForm();
+  if (name === 'manage')   renderManage();
+  if (name === 'data')     renderDataView();
+}
+
+// ── LOG VIEW ─────────────────────────────────────────────
+function renderLog() {
+  const data = loadData();
+  const exercises = loadExercises();
+  const sorted = [...data].sort((a, b) =>
+    b.year !== a.year ? b.year - a.year : b.week - a.week
+  );
+  const el = document.getElementById('view-log');
+  el.innerHTML = '';
+
+  sorted.forEach((entry, idx) => {
+    const card = document.createElement('div');
+    card.className = 'week-card' + (idx === 0 ? ' open' : '');
+
+    // count filled exercises across all cats
+    let filled = 0, total = 0;
+    ['push','pull','legs'].forEach(cat => {
+      const catData = entry.cats[cat] || { exercises: {} };
+      const list = exercises[cat] || [];
+      list.forEach(ex => {
+        total++;
+        if (catData.exercises[ex] !== null && catData.exercises[ex] !== undefined) filled++;
+      });
+    });
+
+    card.innerHTML = `
+      <div class="week-header" onclick="toggleCard(this)">
+        <div class="week-header-left">
+          <div class="week-label">WEEK ${entry.week} · ${entry.year}</div>
+          <div class="week-sub">${filled} van ${total} oefeningen gelogd</div>
+        </div>
+        <div class="week-actions" onclick="event.stopPropagation()">
+          <button class="week-action-btn edit" title="Bewerken" onclick="editWeek(${entry.year},${entry.week})">✏️</button>
+          <button class="week-action-btn delete" title="Verwijderen" onclick="confirmDeleteWeek(${entry.year},${entry.week})">🗑</button>
+        </div>
+        <div class="chevron">⌄</div>
+      </div>
+      <div class="week-body">
+        ${buildLogCat(entry, exercises, 'push', 'Push', 'cat-push')}
+        ${buildLogCat(entry, exercises, 'pull', 'Pull', 'cat-pull')}
+        ${buildLogCat(entry, exercises, 'legs', 'Legs', 'cat-legs')}
+      </div>`;
+    el.appendChild(card);
+  });
+}
+
+function buildLogCat(entry, exercises, cat, label, cls) {
+  const list = exercises[cat] || [];
+  if (!list.length) return '';
+  const catData = entry.cats[cat] || { date: null, exercises: {} };
+  const dateStr = catData.date ? formatDate(catData.date) : null;
+  const safeEntry = JSON.stringify({ year: entry.year, week: entry.week }).replace(/"/g, '&quot;');
+
+  const dateBtn = dateStr
+    ? `<button class="cat-date-btn has-date" onclick="startDateEdit(this,'${entry.year}','${entry.week}','${cat}')">${dateStr}</button>`
+    : `<button class="cat-date-btn" onclick="startDateEdit(this,'${entry.year}','${entry.week}','${cat}')">+ datum</button>`;
+
+  const rows = list.map(ex => {
+    const val = catData.exercises.hasOwnProperty(ex) ? catData.exercises[ex] : null;
+    const isEmpty = val === null;
+    const safeEx = ex.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="exercise-row">
+      <span class="ex-name">${ex}</span>
+      <span class="ex-weight ${isEmpty ? 'empty' : ''}"
+        onclick="startInlineEdit(this,'${entry.year}','${entry.week}','${cat}','${safeEx}',${val})"
+      >${isEmpty ? '+ toevoegen' : val + ' kg'}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="cat-block">
+    <div class="cat-header">
+      <span class="cat-label ${cls}">${label}</span>
+      ${dateBtn}
+    </div>
+    ${rows}
+  </div>`;
+}
+
+function toggleCard(h) { h.parentElement.classList.toggle('open'); }
+
+// ── INLINE DATE EDIT ──────────────────────────────────────
+function startDateEdit(btn, year, week, cat) {
+  if (btn.querySelector('input')) return;
+  const data = loadData();
+  const entry = data.find(e => e.year == year && e.week == week);
+  const catData = entry && entry.cats[cat];
+  const currentDate = catData ? catData.date : null;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cat-date-input-wrap';
+
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.className = 'cat-date-input';
+  if (currentDate) input.value = currentDate;
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'cat-date-clear';
+  clearBtn.textContent = '×';
+
+  wrap.appendChild(input);
+  if (currentDate) wrap.appendChild(clearBtn);
+
+  btn.replaceWith(wrap);
+  input.focus();
+
+  function commit(newDate) {
+    const data2 = loadData();
+    const e = data2.find(x => x.year == year && x.week == week);
+    if (e && e.cats[cat]) e.cats[cat].date = newDate || null;
+    saveData(data2);
+    renderLog();
+    showToast('Datum opgeslagen ✓');
+  }
+
+  input.addEventListener('change', () => commit(input.value || null));
+  input.addEventListener('blur', () => setTimeout(() => { if (wrap.isConnected) commit(input.value || null); }, 200));
+  clearBtn.addEventListener('mousedown', e => { e.preventDefault(); commit(null); });
+}
+
+// ── INLINE WEIGHT EDIT ────────────────────────────────────
+function startInlineEdit(span, year, week, cat, exName, currentVal) {
+  if (span.querySelector('input')) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-edit-wrap';
+
+  const input = document.createElement('input');
+  input.type = 'number'; input.className = 'inline-input';
+  input.placeholder = 'kg'; input.min = '0'; input.step = '0.5';
+  if (currentVal !== null) input.value = currentVal;
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'inline-clear';
+  clearBtn.textContent = '×';
+
+  wrap.appendChild(input);
+  if (currentVal !== null) wrap.appendChild(clearBtn);
+  span.textContent = '';
+  span.appendChild(wrap);
+  span.classList.remove('empty');
+  input.focus(); input.select();
+
+  function commit(newVal) {
+    const data = loadData();
+    const entry = data.find(e => e.year == year && e.week == week);
+    if (entry && entry.cats[cat]) entry.cats[cat].exercises[exName] = newVal;
+    saveData(data);
+    const isEmpty = newVal === null;
+    span.innerHTML = isEmpty ? '+ toevoegen' : newVal + ' kg';
+    span.className = 'ex-weight' + (isEmpty ? ' empty' : '');
+    span.onclick = () => startInlineEdit(span, year, week, cat, exName, newVal);
+    updateWeekSub(year, week);
+    showToast('Opgeslagen ✓');
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  commit(input.value.trim() ? parseFloat(input.value) : null);
+    if (e.key === 'Escape') commit(currentVal);
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (span.querySelector('input')) commit(input.value.trim() ? parseFloat(input.value) : null);
+    }, 150);
+  });
+  clearBtn.addEventListener('mousedown', e => { e.preventDefault(); commit(null); });
+}
+
+function updateWeekSub(year, week) {
+  const data = loadData();
+  const exercises = loadExercises();
+  const entry = data.find(e => e.year == year && e.week == week);
+  if (!entry) return;
+  let filled = 0, total = 0;
+  ['push','pull','legs'].forEach(cat => {
+    const catData = entry.cats[cat] || { exercises: {} };
+    (exercises[cat] || []).forEach(ex => {
+      total++;
+      if (catData.exercises[ex] !== null && catData.exercises[ex] !== undefined) filled++;
+    });
+  });
+  document.querySelectorAll('.week-label').forEach(el => {
+    if (el.textContent === `WEEK ${week} · ${year}`) {
+      const sub = el.nextElementSibling;
+      if (sub) sub.textContent = `${filled} van ${total} oefeningen gelogd`;
+    }
+  });
+}
+
+// ── PROGRESS ─────────────────────────────────────────────
+let activeCat = 'push', selectedEx = null;
+
+function filterCat(cat, btn) {
+  activeCat = cat;
+  document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  selectedEx = null;
+  renderProgress();
+}
+
+function renderProgress() {
+  const exercises = loadExercises();
+  const grid = document.getElementById('ex-grid');
+  grid.innerHTML = '';
+  (exercises[activeCat] || []).forEach(ex => {
+    const btn = document.createElement('button');
+    btn.className = 'ex-btn' + (selectedEx === ex ? ' selected' : '');
+    btn.textContent = ex;
+    btn.onclick = () => { selectedEx = ex; renderProgress(); };
+    grid.appendChild(btn);
+  });
+
+  const chartArea = document.getElementById('chart-area');
+  if (!selectedEx) { chartArea.style.display = 'none'; return; }
+
+  const data = loadData().sort((a, b) =>
+    a.year !== b.year ? a.year - b.year : a.week - b.week
+  );
+  const points = data.map(entry => {
+    const catData = entry.cats[activeCat];
+    const val = catData && catData.exercises[selectedEx] !== undefined ? catData.exercises[selectedEx] : null;
+    return { label: `W${entry.week} '${String(entry.year).slice(2)}`, val };
+  }).filter(p => p.val !== null);
+
+  chartArea.style.display = 'block';
+  if (!points.length) {
+    chartArea.innerHTML = `<div class="chart-title">${selectedEx}</div><div class="chart-no-data">Nog geen data</div>`;
+    return;
+  }
+
+  const maxVal = Math.max(...points.map(p => p.val));
+  const minVal = Math.min(...points.map(p => p.val));
+  const range = maxVal - minVal || 10;
+  const W = 300, H = 140, pad = { t: 18, b: 20, l: 10, r: 10 };
+  let svgPts = '', dots = '';
+  points.forEach((p, i) => {
+    const x = points.length === 1 ? W/2 : pad.l + (i / (points.length - 1)) * (W - pad.l - pad.r);
+    const y = H - pad.b - ((p.val - minVal) / range) * (H - pad.t - pad.b);
+    svgPts += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
+    dots += `<circle cx="${x}" cy="${y}" r="5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+      <text x="${x}" y="${y-10}" text-anchor="middle" fill="var(--accent)" font-size="11" font-family="DM Sans" font-weight="600">${p.val}</text>
+      <text x="${x}" y="${H}" text-anchor="middle" fill="var(--muted)" font-size="10" font-family="DM Sans">${p.label}</text>`;
+  });
+
+  const dpRows = points.map((p, i) => {
+    let delta = '';
+    if (i > 0) {
+      const diff = p.val - points[i-1].val;
+      delta = diff > 0 ? `<span class="dp-delta dp-up">+${diff}</span>`
+            : diff < 0 ? `<span class="dp-delta dp-down">${diff}</span>`
+            : `<span class="dp-delta dp-same">=</span>`;
+    }
+    return `<div class="dp-row"><span>${p.label}</span><span>${delta} <span class="dp-val">${p.val} kg</span></span></div>`;
+  }).join('');
+
+  chartArea.innerHTML = `
+    <div class="chart-title">${selectedEx}</div>
+    <div class="chart-wrap">
+      <svg class="linechart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <path d="${svgPts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${dots}
+      </svg>
+    </div>
+    <div class="data-points">${dpRows}</div>`;
+}
+
+// ── ADD WEEK FORM ─────────────────────────────────────────
+function exToId(cat, ex) { return 'f-' + cat + '-' + ex.replace(/[^a-z0-9]/gi, '-').toLowerCase(); }
+
+function renderAddForm() {
+  const exercises = loadExercises();
+  document.getElementById('add-form-body').innerHTML = [
+    { cat: 'push', label: 'Push', cls: 'cat-push' },
+    { cat: 'pull', label: 'Pull', cls: 'cat-pull' },
+    { cat: 'legs', label: 'Legs', cls: 'cat-legs' },
+  ].map(({ cat, label, cls }) => {
+    const list = exercises[cat] || [];
+    if (!list.length) return '';
+    const rows = list.map(ex =>
+      `<div class="form-row"><label>${ex}</label><input type="number" id="${exToId(cat,ex)}" placeholder="kg"></div>`
+    ).join('');
+    return `<div class="form-section">
+      <div class="form-section-header">
+        <div class="form-section-title ${cls}">${label}</div>
+        <div class="form-section-date">
+          <label>Datum</label>
+          <input type="date" id="date-${cat}">
+        </div>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function saveWeek() {
+  const year = parseInt(document.getElementById('new-year').value);
+  const week = parseInt(document.getElementById('new-week').value);
+  if (!year || !week || week < 1 || week > 53) { alert('Vul een geldig jaar en weeknummer in'); return; }
+
+  const exercises = loadExercises();
+  const cats = {};
+  ['push','pull','legs'].forEach(cat => {
+    const date = document.getElementById('date-' + cat)?.value || null;
+    const exObj = {};
+    (exercises[cat] || []).forEach(ex => {
+      const el = document.getElementById(exToId(cat, ex));
+      exObj[ex] = el && el.value ? parseFloat(el.value) : null;
+    });
+    cats[cat] = { date: date || null, exercises: exObj };
+  });
+
+  const data = loadData();
+  const idx = data.findIndex(e => e.year === year && e.week === week);
+  if (idx >= 0) {
+    ['push','pull','legs'].forEach(cat => {
+      data[idx].cats[cat] = {
+        date: cats[cat].date || data[idx].cats[cat]?.date || null,
+        exercises: { ...(data[idx].cats[cat]?.exercises || {}), ...cats[cat].exercises }
+      };
+    });
+  } else {
+    data.push({ year, week, cats });
+  }
+  saveData(data);
+
+  // clear
+  ['push','pull','legs'].forEach(cat => {
+    const di = document.getElementById('date-' + cat); if (di) di.value = '';
+    (exercises[cat] || []).forEach(ex => {
+      const el = document.getElementById(exToId(cat, ex)); if (el) el.value = '';
+    });
+  });
+
+  showToast('Week opgeslagen! 💪');
+  setTimeout(() => showTab('log'), 400);
+}
+
+// ── MANAGE EXERCISES ──────────────────────────────────────
+let manageCat = 'push';
+
+function switchManageCat(cat, btn) {
+  manageCat = cat;
+  document.querySelectorAll('.manage-cat-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('new-ex-name').value = '';
+  renderManage();
+}
+
+function renderManage() {
+  const exercises = loadExercises();
+  const list = document.getElementById('manage-list');
+  const items = exercises[manageCat] || [];
+  list.innerHTML = '';
+
+  if (!items.length) {
+    list.innerHTML = `<p style="color:var(--muted);font-size:13px;padding:8px 0;">Geen oefeningen. Voeg er een toe hieronder.</p>`;
+    return;
+  }
+
+  items.forEach(ex => {
+    const item = document.createElement('div');
+    item.className = 'manage-item';
+    const safeEx = ex.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    item.innerHTML = `
+      <input class="manage-item-name" type="text" value="${ex.replace(/"/g,'&quot;')}" readonly tabindex="-1" maxlength="40">
+      <button class="item-action-btn edit-btn" title="Hernoemen" onclick="startRename(this,'${safeEx}')">✏️</button>
+      <button class="item-action-btn delete-btn" title="Verwijderen" onclick="confirmDelete('${safeEx}')">🗑</button>`;
+    list.appendChild(item);
+  });
+}
+
+function startRename(editBtn, oldName) {
+  const item = editBtn.closest('.manage-item');
+  const input = item.querySelector('.manage-item-name');
+  const delBtn = item.querySelector('.delete-btn');
+  input.readOnly = false;
+  input.classList.add('editable');
+  input.tabIndex = 0;
+  item.classList.add('editing');
+  input.focus(); input.select();
+  editBtn.textContent = '✓';
+  editBtn.className = 'item-action-btn confirm-rename';
+  editBtn.title = 'Opslaan';
+  editBtn.onclick = () => commitRename(oldName, input.value.trim());
+  delBtn.textContent = '✕';
+  delBtn.className = 'item-action-btn cancel-rename';
+  delBtn.title = 'Annuleren';
+  delBtn.onclick = () => renderManage();
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  commitRename(oldName, input.value.trim());
+    if (e.key === 'Escape') renderManage();
+  });
+}
+
+function commitRename(oldName, newName) {
+  if (!newName || newName === oldName) { renderManage(); return; }
+  const exercises = loadExercises();
+  const idx = (exercises[manageCat] || []).indexOf(oldName);
+  if (idx < 0) { renderManage(); return; }
+  if (exercises[manageCat].includes(newName)) { showToast('Naam bestaat al!'); return; }
+  exercises[manageCat][idx] = newName;
+  saveExercises(exercises);
+  const data = loadData();
+  data.forEach(entry => {
+    ['push','pull','legs'].forEach(cat => {
+      const catData = entry.cats[cat];
+      if (catData && catData.exercises.hasOwnProperty(oldName)) {
+        catData.exercises[newName] = catData.exercises[oldName];
+        delete catData.exercises[oldName];
+      }
+    });
+  });
+  saveData(data);
+  showToast(`Hernoemd naar "${newName}" ✓`);
+  renderManage();
+}
+
+function confirmDelete(exName) {
+  openModal('Oefening verwijderen?',
+    `"${exName}" wordt verwijderd uit de lijst en uit alle weken.`,
+    () => deleteExercise(exName)
+  );
+}
+
+function deleteExercise(exName) {
+  const exercises = loadExercises();
+  exercises[manageCat] = (exercises[manageCat] || []).filter(e => e !== exName);
+  saveExercises(exercises);
+  const data = loadData();
+  data.forEach(entry => {
+    ['push','pull','legs'].forEach(cat => {
+      if (entry.cats[cat]) delete entry.cats[cat].exercises[exName];
+    });
+  });
+  saveData(data);
+  showToast(`"${exName}" verwijderd`);
+  renderManage();
+}
+
+function addExercise() {
+  const input = document.getElementById('new-ex-name');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  const exercises = loadExercises();
+  if (!exercises[manageCat]) exercises[manageCat] = [];
+  const allEx = [...exercises.push, ...exercises.pull, ...exercises.legs];
+  if (allEx.includes(name)) { showToast('Bestaat al!'); return; }
+  exercises[manageCat].push(name);
+  saveExercises(exercises);
+  const data = loadData();
+  data.forEach(entry => {
+    if (!entry.cats[manageCat]) entry.cats[manageCat] = { date: null, exercises: {} };
+    if (!entry.cats[manageCat].exercises.hasOwnProperty(name)) {
+      entry.cats[manageCat].exercises[name] = null;
+    }
+  });
+  saveData(data);
+  input.value = '';
+  showToast(`"${name}" toegevoegd ✓`);
+  renderManage();
+}
+
+document.getElementById('new-ex-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addExercise();
+});
+
+// ── MODAL ────────────────────────────────────────────────
+
+// ── EDIT / DELETE WEEK ───────────────────────────────────
+function editWeek(year, week) {
+  // Switch to add tab and prefill with this week's data
+  showTab('add');
+
+  // Set year and week
+  document.getElementById('new-year').value = year;
+  document.getElementById('new-week').value = week;
+
+  // Prefill exercise values and dates
+  const data = loadData();
+  const entry = data.find(e => e.year === year && e.week === week);
+  if (!entry) return;
+
+  const exercises = loadExercises();
+  ['push','pull','legs'].forEach(cat => {
+    const catData = entry.cats[cat];
+    if (!catData) return;
+
+    // Set date
+    const dateEl = document.getElementById('date-' + cat);
+    if (dateEl) dateEl.value = catData.date || '';
+
+    // Set exercise values
+    (exercises[cat] || []).forEach(ex => {
+      const el = document.getElementById(exToId(cat, ex));
+      if (!el) return;
+      const val = catData.exercises[ex];
+      el.value = val !== null && val !== undefined ? val : '';
+    });
+  });
+}
+
+function confirmDeleteWeek(year, week) {
+  openModal(
+    `Week ${week} · ${year} verwijderen?`,
+    'Alle gelogde oefeningen van deze week worden permanent verwijderd.',
+    () => deleteWeek(year, week)
+  );
+}
+
+function deleteWeek(year, week) {
+  const data = loadData();
+  const filtered = data.filter(e => !(e.year === year && e.week === week));
+  saveData(filtered);
+  renderLog();
+  showToast(`Week ${week} verwijderd`);
+}
+
+let _modalAction = null;
+function openModal(title, body, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = body;
+  _modalAction = onConfirm;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  _modalAction = null;
+}
+document.getElementById('modal-confirm-btn').onclick = () => {
+  if (_modalAction) _modalAction();
+  closeModal();
+};
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+
+// DATA EXPORT / IMPORT / RESET
+function exportData() {
+  const payload = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    weeks: loadData(),
+    exercises: loadExercises()
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'workout-backup-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup gedownload ✓');
+}
+
+function importData(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const payload = JSON.parse(e.target.result);
+      // accept both v2 format and raw arrays
+      const weeks = payload.weeks || (Array.isArray(payload) ? payload : null);
+      const exercises = payload.exercises || null;
+      if (!weeks) { showToast('Ongeldig bestand!'); return; }
+      saveData(weeks);
+      if (exercises) saveExercises(exercises);
+      showToast('Gegevens geimporteerd! ✓');
+      renderLog();
+      renderProgress();
+      renderAddForm();
+      renderDataView();
+    } catch(err) {
+      showToast('Fout bij importeren!');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function confirmReset() {
+  openModal(
+    'Alles verwijderen?',
+    'Alle workouts en oefeningen worden permanent verwijderd. Dit kan niet ongedaan worden gemaakt.',
+    () => {
+      localStorage.removeItem('workout_weeks_v2');
+      localStorage.removeItem('workout_log_v1');
+      // Store empty exercises so loadExercises() doesn't restore defaults
+      localStorage.setItem('workout_exercises_v1', JSON.stringify({ push: [], pull: [], legs: [] }));
+      renderLog();
+      renderProgress();
+      renderAddForm();
+      renderDataView();
+      showToast('Alles verwijderd');
+    }
+  );
+}
+
+function renderDataView() {
+  // wire up file input and drag/drop each time view is shown
+  const fileInput = document.getElementById('import-file-input');
+  const drop = document.getElementById('import-drop');
+  if (!fileInput || !drop) return;
+
+  // reset to avoid duplicate listeners by cloning
+  const newInput = fileInput.cloneNode(true);
+  fileInput.parentNode.replaceChild(newInput, fileInput);
+  newInput.addEventListener('change', e => importData(e.target.files[0]));
+
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+  drop.ondragleave = () => drop.classList.remove('dragover');
+  drop.ondrop = e => {
+    e.preventDefault();
+    drop.classList.remove('dragover');
+    importData(e.dataTransfer.files[0]);
+  };
+}
+
+// ── INIT ─────────────────────────────────────────────────
+const { year: cy, week: cw } = getCurrentYearWeek();
+document.getElementById('new-year').value = cy;
+document.getElementById('new-week').value = cw;
+renderLog();
+renderProgress();
+renderAddForm();
+renderDataView();
+</script>
+</body>
+</html>
