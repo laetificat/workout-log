@@ -254,9 +254,21 @@
   .manage-item {
     display: flex; align-items: center; gap: 8px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, opacity 0.15s, background 0.15s;
   }
   .manage-item.editing { border-color: var(--accent); }
+  .manage-item.dragging { opacity: 0.35; }
+  .manage-item.drag-over { border-color: var(--accent); background: var(--surface2); }
+  .drag-handle {
+    cursor: grab; color: var(--muted); font-size: 18px; line-height: 1;
+    padding: 2px 4px; user-select: none; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;
+  }
+  .drag-handle::before, .drag-handle::after {
+    content: ''; display: block; width: 12px; height: 2px;
+    background: var(--muted); border-radius: 1px; box-shadow: 0 4px 0 var(--muted);
+  }
+  .drag-handle:active { cursor: grabbing; }
   .manage-item-name {
     flex: 1; font-size: 14px; color: var(--text); background: none;
     border: none; outline: none; font-family: 'DM Sans', sans-serif; cursor: default;
@@ -936,16 +948,64 @@ function renderManage() {
     return;
   }
 
-  items.forEach(ex => {
+  items.forEach((ex, idx) => {
     const item = document.createElement('div');
     item.className = 'manage-item';
+    item.draggable = true;
+    item.dataset.index = idx;
     const safeEx = ex.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     item.innerHTML = `
+      <span class="drag-handle" title="Slepen om volgorde te wijzigen"></span>
       <input class="manage-item-name" type="text" value="${ex.replace(/"/g,'&quot;')}" readonly tabindex="-1" maxlength="40">
       <button class="item-action-btn edit-btn" title="Hernoemen" onclick="startRename(this,'${safeEx}')">✏️</button>
       <button class="item-action-btn delete-btn" title="Verwijderen" onclick="confirmDelete('${safeEx}')">🗑</button>`;
+    item.addEventListener('dragstart', onExDragStart);
+    item.addEventListener('dragover', onExDragOver);
+    item.addEventListener('dragleave', onExDragLeave);
+    item.addEventListener('drop', onExDrop);
+    item.addEventListener('dragend', onExDragEnd);
     list.appendChild(item);
   });
+}
+
+let exDragSrcIndex = null;
+
+function onExDragStart(e) {
+  exDragSrcIndex = parseInt(this.dataset.index);
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onExDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('#manage-list .manage-item').forEach(el => el.classList.remove('drag-over'));
+  if (parseInt(this.dataset.index) !== exDragSrcIndex) {
+    this.classList.add('drag-over');
+  }
+}
+
+function onExDragLeave() {
+  this.classList.remove('drag-over');
+}
+
+function onExDrop(e) {
+  e.preventDefault();
+  const dropIndex = parseInt(this.dataset.index);
+  if (exDragSrcIndex === null || exDragSrcIndex === dropIndex) return;
+  const exercises = loadExercises();
+  const items = exercises[manageCat];
+  const [moved] = items.splice(exDragSrcIndex, 1);
+  items.splice(dropIndex, 0, moved);
+  saveExercises(exercises);
+  renderManage();
+}
+
+function onExDragEnd() {
+  document.querySelectorAll('#manage-list .manage-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
+  exDragSrcIndex = null;
 }
 
 function startRename(editBtn, oldName) {
