@@ -964,6 +964,9 @@ function renderManage() {
     item.addEventListener('dragleave', onExDragLeave);
     item.addEventListener('drop', onExDrop);
     item.addEventListener('dragend', onExDragEnd);
+    item.addEventListener('touchstart', onExTouchStart, { passive: false });
+    item.addEventListener('touchmove', onExTouchMove, { passive: false });
+    item.addEventListener('touchend', onExTouchEnd);
     list.appendChild(item);
   });
 }
@@ -1006,6 +1009,49 @@ function onExDragEnd() {
     el.classList.remove('dragging', 'drag-over');
   });
   exDragSrcIndex = null;
+}
+
+let touchDragSrcIndex = null;
+
+function onExTouchStart(e) {
+  if (!e.target.classList.contains('drag-handle')) return;
+  e.preventDefault();
+  touchDragSrcIndex = parseInt(this.dataset.index);
+  this.classList.add('dragging');
+}
+
+function onExTouchMove(e) {
+  if (touchDragSrcIndex === null) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const item = el ? el.closest('.manage-item') : null;
+  document.querySelectorAll('#manage-list .manage-item').forEach(el => el.classList.remove('drag-over'));
+  if (item && parseInt(item.dataset.index) !== touchDragSrcIndex) {
+    item.classList.add('drag-over');
+  }
+}
+
+function onExTouchEnd(e) {
+  if (touchDragSrcIndex === null) return;
+  const touch = e.changedTouches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const item = el ? el.closest('.manage-item') : null;
+  document.querySelectorAll('#manage-list .manage-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
+  if (item) {
+    const dropIndex = parseInt(item.dataset.index);
+    if (touchDragSrcIndex !== dropIndex) {
+      const exercises = loadExercises();
+      const exItems = exercises[manageCat];
+      const [moved] = exItems.splice(touchDragSrcIndex, 1);
+      exItems.splice(dropIndex, 0, moved);
+      saveExercises(exercises);
+      renderManage();
+    }
+  }
+  touchDragSrcIndex = null;
 }
 
 function startRename(editBtn, oldName) {
