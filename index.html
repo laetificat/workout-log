@@ -127,7 +127,9 @@
     padding: 7px 0; border-bottom: 1px solid var(--border);
   }
   .exercise-row:last-child { border-bottom: none; }
-  .ex-name { color: #ccc; font-size: 14px; flex: 1; }
+  .ex-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .ex-name { color: #ccc; font-size: 14px; }
+  .ex-prev-hint { font-size: 11px; color: var(--muted); }
 
   .ex-weight {
     font-weight: 600; font-size: 14px; color: var(--text);
@@ -601,6 +603,7 @@ function renderLog() {
   el.innerHTML = '';
 
   sorted.forEach((entry, idx) => {
+    const prevEntry = idx + 1 < sorted.length ? sorted[idx + 1] : null;
     const card = document.createElement('div');
     card.className = 'week-card' + (idx === 0 ? ' open' : '');
 
@@ -628,18 +631,19 @@ function renderLog() {
         <div class="chevron">⌄</div>
       </div>
       <div class="week-body">
-        ${buildLogCat(entry, exercises, 'push', 'Push', 'cat-push')}
-        ${buildLogCat(entry, exercises, 'pull', 'Pull', 'cat-pull')}
-        ${buildLogCat(entry, exercises, 'legs', 'Legs', 'cat-legs')}
+        ${buildLogCat(entry, exercises, 'push', 'Push', 'cat-push', prevEntry)}
+        ${buildLogCat(entry, exercises, 'pull', 'Pull', 'cat-pull', prevEntry)}
+        ${buildLogCat(entry, exercises, 'legs', 'Legs', 'cat-legs', prevEntry)}
       </div>`;
     el.appendChild(card);
   });
 }
 
-function buildLogCat(entry, exercises, cat, label, cls) {
+function buildLogCat(entry, exercises, cat, label, cls, prevEntry) {
   const list = exercises[cat] || [];
   if (!list.length) return '';
   const catData = entry.cats[cat] || { date: null, exercises: {} };
+  const prevCatData = prevEntry ? (prevEntry.cats[cat] || { exercises: {} }) : null;
   const dateStr = catData.date ? formatDate(catData.date) : null;
   const safeEntry = JSON.stringify({ year: entry.year, week: entry.week }).replace(/"/g, '&quot;');
 
@@ -651,8 +655,20 @@ function buildLogCat(entry, exercises, cat, label, cls) {
     const val = catData.exercises.hasOwnProperty(ex) ? catData.exercises[ex] : null;
     const isEmpty = val === null;
     const safeEx = ex.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    let prevHint = '';
+    if (prevCatData) {
+      const prevVal = prevCatData.exercises.hasOwnProperty(ex) ? prevCatData.exercises[ex] : null;
+      if (prevVal !== null) {
+        prevHint = `<span class="ex-prev-hint">vorige: ${prevVal} kg</span>`;
+      }
+    }
+
     return `<div class="exercise-row">
-      <span class="ex-name">${ex}</span>
+      <div class="ex-info">
+        <span class="ex-name">${ex}</span>
+        ${prevHint}
+      </div>
       <span class="ex-weight ${isEmpty ? 'empty' : ''}"
         onclick="startInlineEdit(this,'${entry.year}','${entry.week}','${cat}','${safeEx}',${val})"
       >${isEmpty ? '+ toevoegen' : val + ' kg'}</span>
