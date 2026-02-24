@@ -271,6 +271,26 @@
     background: var(--muted); border-radius: 1px; box-shadow: 0 4px 0 var(--muted);
   }
   .drag-handle:active { cursor: grabbing; }
+
+  .log-drag-handle {
+    cursor: grab; color: var(--muted); font-size: 18px; line-height: 1;
+    padding: 2px 8px 2px 0; user-select: none; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;
+  }
+  .log-drag-handle::before, .log-drag-handle::after {
+    content: ''; display: block; width: 12px; height: 2px;
+    background: var(--muted); border-radius: 1px; box-shadow: 0 4px 0 var(--muted);
+  }
+  .log-drag-handle:active { cursor: grabbing; }
+  .exercise-row.dragging { opacity: 0.35; }
+  .exercise-row.drag-over { box-shadow: 0 -2px 0 var(--accent); }
+  .cat-reset-order-btn {
+    background: none; border: none; color: var(--muted); font-size: 14px;
+    cursor: pointer; padding: 2px 5px; border-radius: 6px; line-height: 1;
+    transition: color 0.12s; margin-right: 4px;
+  }
+  .cat-reset-order-btn:hover { color: var(--accent); }
+
   .manage-item-name {
     flex: 1; font-size: 14px; color: var(--text); background: none;
     border: none; outline: none; font-family: 'DM Sans', sans-serif; cursor: default;
@@ -606,6 +626,8 @@ function renderLog() {
     const prevEntry = idx + 1 < sorted.length ? sorted[idx + 1] : null;
     const card = document.createElement('div');
     card.className = 'week-card' + (idx === 0 ? ' open' : '');
+    card.dataset.year = entry.year;
+    card.dataset.week = entry.week;
 
     // count filled exercises across all cats
     let filled = 0, total = 0;
@@ -636,22 +658,37 @@ function renderLog() {
         ${buildLogCat(entry, exercises, 'legs', 'Legs', 'cat-legs', prevEntry)}
       </div>`;
     el.appendChild(card);
+    setupLogCardDrag(card);
   });
 }
 
+function getWeekCatOrder(catData, globalList) {
+  if (!catData.order || !catData.order.length) return globalList;
+  // Use custom order filtered to existing exercises, then append any new ones
+  const customFiltered = catData.order.filter(ex => globalList.includes(ex));
+  const missing = globalList.filter(ex => !customFiltered.includes(ex));
+  return [...customFiltered, ...missing];
+}
+
 function buildLogCat(entry, exercises, cat, label, cls, prevEntry) {
-  const list = exercises[cat] || [];
-  if (!list.length) return '';
+  const globalList = exercises[cat] || [];
+  if (!globalList.length) return '';
   const catData = entry.cats[cat] || { date: null, exercises: {} };
   const prevCatData = prevEntry ? (prevEntry.cats[cat] || { exercises: {} }) : null;
   const dateStr = catData.date ? formatDate(catData.date) : null;
-  const safeEntry = JSON.stringify({ year: entry.year, week: entry.week }).replace(/"/g, '&quot;');
+
+  const list = getWeekCatOrder(catData, globalList);
+  const hasCustomOrder = catData.order && catData.order.length > 0;
 
   const dateBtn = dateStr
     ? `<button class="cat-date-btn has-date" onclick="startDateEdit(this,'${entry.year}','${entry.week}','${cat}')">${dateStr}</button>`
     : `<button class="cat-date-btn" onclick="startDateEdit(this,'${entry.year}','${entry.week}','${cat}')">+ datum</button>`;
 
-  const rows = list.map(ex => {
+  const resetBtn = hasCustomOrder
+    ? `<button class="cat-reset-order-btn" title="Herstel globale volgorde" onclick="resetWeekCatOrder(${entry.year},${entry.week},'${cat}')">↺</button>`
+    : '';
+
+  const rows = list.map((ex, idx) => {
     const val = catData.exercises.hasOwnProperty(ex) ? catData.exercises[ex] : null;
     const isEmpty = val === null;
     const safeEx = ex.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
@@ -664,7 +701,8 @@ function buildLogCat(entry, exercises, cat, label, cls, prevEntry) {
       }
     }
 
-    return `<div class="exercise-row">
+    return `<div class="exercise-row" draggable="true" data-year="${entry.year}" data-week="${entry.week}" data-cat="${cat}" data-index="${idx}">
+      <span class="log-drag-handle" title="Versleep om volgorde voor deze week te wijzigen"></span>
       <div class="ex-info">
         <span class="ex-name">${ex}</span>
         ${prevHint}
@@ -678,7 +716,7 @@ function buildLogCat(entry, exercises, cat, label, cls, prevEntry) {
   return `<div class="cat-block">
     <div class="cat-header">
       <span class="cat-label ${cls}">${label}</span>
-      ${dateBtn}
+      <div style="display:flex;align-items:center;gap:4px;">${resetBtn}${dateBtn}</div>
     </div>
     ${rows}
   </div>`;
@@ -1068,6 +1106,174 @@ function onExTouchEnd(e) {
     }
   }
   touchDragSrcIndex = null;
+}
+
+// ── PER-WEEK EXERCISE ORDERING ────────────────────────────
+
+let logDragSrc = null; // { year, week, cat, index }
+let logTouchSrc = null;
+
+function attachLogRowDrag(row) {
+  row.addEventListener('dragstart', onLogDragStart);
+  row.addEventListener('dragover',  onLogDragOver);
+  row.addEventListener('dragleave', onLogDragLeave);
+  row.addEventListener('drop',      onLogDrop);
+  row.addEventListener('dragend',   onLogDragEnd);
+  row.addEventListener('touchstart', onLogTouchStart, { passive: false });
+  row.addEventListener('touchmove',  onLogTouchMove,  { passive: false });
+  row.addEventListener('touchend',   onLogTouchEnd);
+}
+
+function setupLogCardDrag(card) {
+  card.querySelectorAll('.exercise-row[draggable]').forEach(attachLogRowDrag);
+}
+
+function rerenderLogCat(year, week, cat) {
+  const data = loadData();
+  const exercises = loadExercises();
+  const sorted = [...data].sort((a, b) =>
+    b.year !== a.year ? b.year - a.year : b.week - a.week
+  );
+  const idx = sorted.findIndex(e => e.year == year && e.week == week);
+  const entry = sorted[idx];
+  if (!entry) return;
+  const prevEntry = idx + 1 < sorted.length ? sorted[idx + 1] : null;
+  const labelMap = { push: 'Push', pull: 'Pull', legs: 'Legs' };
+  const clsMap   = { push: 'cat-push', pull: 'cat-pull', legs: 'cat-legs' };
+
+  const card = document.querySelector(`.week-card[data-year="${year}"][data-week="${week}"]`);
+  if (!card) return;
+  const weekBody = card.querySelector('.week-body');
+  const catIndex = ['push','pull','legs'].indexOf(cat);
+  const oldBlock = weekBody.querySelectorAll('.cat-block')[catIndex];
+  if (!oldBlock) return;
+
+  const tmp = document.createElement('div');
+  tmp.innerHTML = buildLogCat(entry, exercises, cat, labelMap[cat], clsMap[cat], prevEntry);
+  const newBlock = tmp.firstElementChild;
+  weekBody.replaceChild(newBlock, oldBlock);
+  newBlock.querySelectorAll('.exercise-row[draggable]').forEach(attachLogRowDrag);
+}
+
+function saveWeekCatOrder(year, week, cat, newOrder) {
+  const data = loadData();
+  const entry = data.find(e => e.year == year && e.week == week);
+  if (!entry) return;
+  if (!entry.cats[cat]) entry.cats[cat] = { date: null, exercises: {} };
+  entry.cats[cat].order = newOrder;
+  saveData(data);
+}
+
+function resetWeekCatOrder(year, week, cat) {
+  const data = loadData();
+  const entry = data.find(e => e.year == year && e.week == week);
+  if (!entry || !entry.cats[cat]) return;
+  delete entry.cats[cat].order;
+  saveData(data);
+  rerenderLogCat(year, week, cat);
+}
+
+function onLogDragStart(e) {
+  logDragSrc = {
+    year:  parseInt(this.dataset.year),
+    week:  parseInt(this.dataset.week),
+    cat:   this.dataset.cat,
+    index: parseInt(this.dataset.index)
+  };
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onLogDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (!logDragSrc) return;
+  if (this.dataset.cat !== logDragSrc.cat ||
+      this.dataset.year != logDragSrc.year ||
+      this.dataset.week != logDragSrc.week) return;
+  const catBlock = this.closest('.cat-block');
+  catBlock.querySelectorAll('.exercise-row').forEach(r => r.classList.remove('drag-over'));
+  if (parseInt(this.dataset.index) !== logDragSrc.index) this.classList.add('drag-over');
+}
+
+function onLogDragLeave() {
+  this.classList.remove('drag-over');
+}
+
+function onLogDrop(e) {
+  e.preventDefault();
+  if (!logDragSrc) return;
+  const dropIndex = parseInt(this.dataset.index);
+  const { year, week, cat, index: srcIndex } = logDragSrc;
+  if (this.dataset.cat !== cat || this.dataset.year != year || this.dataset.week != week) return;
+  if (srcIndex === dropIndex) return;
+
+  const exercises = loadExercises();
+  const data = loadData();
+  const entry = data.find(en => en.year == year && en.week == week);
+  const catData = (entry && entry.cats[cat]) || { date: null, exercises: {} };
+  const newOrder = getWeekCatOrder(catData, exercises[cat] || []);
+  const [moved] = newOrder.splice(srcIndex, 1);
+  newOrder.splice(dropIndex, 0, moved);
+  saveWeekCatOrder(year, week, cat, newOrder);
+  rerenderLogCat(year, week, cat);
+}
+
+function onLogDragEnd() {
+  document.querySelectorAll('.exercise-row').forEach(r => r.classList.remove('dragging', 'drag-over'));
+  logDragSrc = null;
+}
+
+function onLogTouchStart(e) {
+  if (!e.target.classList.contains('log-drag-handle')) return;
+  e.preventDefault();
+  logTouchSrc = {
+    year:  parseInt(this.dataset.year),
+    week:  parseInt(this.dataset.week),
+    cat:   this.dataset.cat,
+    index: parseInt(this.dataset.index)
+  };
+  this.classList.add('dragging');
+}
+
+function onLogTouchMove(e) {
+  if (!logTouchSrc) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const row = el ? el.closest('.exercise-row') : null;
+  document.querySelectorAll('.exercise-row').forEach(r => r.classList.remove('drag-over'));
+  if (row && row.dataset.cat === logTouchSrc.cat &&
+      row.dataset.year == logTouchSrc.year && row.dataset.week == logTouchSrc.week &&
+      parseInt(row.dataset.index) !== logTouchSrc.index) {
+    row.classList.add('drag-over');
+  }
+}
+
+function onLogTouchEnd(e) {
+  if (!logTouchSrc) return;
+  const touch = e.changedTouches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const row = el ? el.closest('.exercise-row') : null;
+  document.querySelectorAll('.exercise-row').forEach(r => r.classList.remove('dragging', 'drag-over'));
+
+  if (row && row.dataset.cat === logTouchSrc.cat &&
+      row.dataset.year == logTouchSrc.year && row.dataset.week == logTouchSrc.week) {
+    const dropIndex = parseInt(row.dataset.index);
+    const { year, week, cat, index: srcIndex } = logTouchSrc;
+    if (srcIndex !== dropIndex) {
+      const exercises = loadExercises();
+      const data = loadData();
+      const entry = data.find(en => en.year == year && en.week == week);
+      const catData = (entry && entry.cats[cat]) || { date: null, exercises: {} };
+      const newOrder = getWeekCatOrder(catData, exercises[cat] || []);
+      const [moved] = newOrder.splice(srcIndex, 1);
+      newOrder.splice(dropIndex, 0, moved);
+      saveWeekCatOrder(year, week, cat, newOrder);
+      rerenderLogCat(year, week, cat);
+    }
+  }
+  logTouchSrc = null;
 }
 
 function startRename(editBtn, oldName) {
